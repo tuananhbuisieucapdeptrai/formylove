@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>For My Love ❤️</title>
+<style>
+body { margin:0; overflow:hidden; background:black; }
+#btn{
+position:absolute;
+top:10px;
+right:10px;
+padding:8px 12px;
+cursor:pointer;
+z-index:10;
+}
+</style>
+</head>
+<body>
+
+<button id="btn">Start</button>
+<video id="video" style="display:none"></video>
+<audio id="music" src="music.mp3" loop></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+
+let scene = new THREE.Scene();
+
+let camera = new THREE.PerspectiveCamera(
+75,
+window.innerWidth/window.innerHeight,
+0.1,
+1000
+);
+camera.position.z = 8;
+
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener("resize",()=>{
+renderer.setSize(window.innerWidth,window.innerHeight);
+camera.aspect = window.innerWidth/window.innerHeight;
+camera.updateProjectionMatrix();
+});
+
+
+// GALAXY BACKGROUND
+const STAR_COUNT = 6000;
+let starGeo = new THREE.BufferGeometry();
+let starPos = new Float32Array(STAR_COUNT*3);
+
+for(let i=0;i<STAR_COUNT;i++){
+starPos[i*3]=(Math.random()-0.5)*200;
+starPos[i*3+1]=(Math.random()-0.5)*200;
+starPos[i*3+2]=(Math.random()-0.5)*200;
+}
+
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPos,3));
+
+let starMat = new THREE.PointsMaterial({
+color:0xffffff,
+size:0.7
+});
+
+let stars = new THREE.Points(starGeo,starMat);
+scene.add(stars);
+
+
+// HEART
+const COUNT = 8000;
+
+let geometry = new THREE.BufferGeometry();
+let positions = new Float32Array(COUNT*3);
+let basePositions = new Float32Array(COUNT*3);
+let colors = new Float32Array(COUNT*3);
+
+geometry.setAttribute("position", new THREE.BufferAttribute(positions,3));
+geometry.setAttribute("color", new THREE.BufferAttribute(colors,3));
+
+let material = new THREE.PointsMaterial({
+size:0.05,
+vertexColors:true
+});
+
+let particles = new THREE.Points(geometry,material);
+scene.add(particles);
+
+let heartPositions = [];
+let textPositions = [];
+
+function generateHeart(){
+heartPositions = [];
+for(let i=0;i<COUNT;i++){
+let t = Math.random()*Math.PI*2;
+let x = 16*Math.pow(Math.sin(t),3);
+let y = 13*Math.cos(t)
+-5*Math.cos(2*t)
+-2*Math.cos(3*t)
+-Math.cos(4*t);
+let z = (Math.random()-0.5)*2;
+heartPositions.push(x/10,y/10,z);
+}
+}
+
+function generateText(){
+
+let canvas = document.createElement("canvas");
+let ctx = canvas.getContext("2d");
+
+canvas.width = 1400;
+canvas.height = 400;
+
+ctx.fillStyle="white";
+ctx.font="bold 150px Arial"; 
+ctx.textAlign="center";
+ctx.fillText("TUAN ANH",canvas.width/2,250);
+
+let data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+
+const viewHeight =
+2*Math.tan((camera.fov*Math.PI/180)/2)*camera.position.z;
+const viewWidth = viewHeight*camera.aspect;
+
+textPositions = [];
+
+for(let y=0;y<canvas.height;y+=3){
+for(let x=0;x<canvas.width;x+=3){
+let i=(y*canvas.width+x)*4;
+if(data[i+3]>128){
+textPositions.push(
+(x-canvas.width/2)/canvas.width*viewWidth*0.6, 
+(canvas.height/2-y)/canvas.height*viewHeight*0.35,
+(Math.random()-0.5)*1.5
+);
+}
+}
+}
+}
+
+generateHeart();
+generateText();
+
+let targetPositions = heartPositions;
+
+let hue=0;
+let time=0;
+
+let targetRotationY=0;
+let currentRotationY=0;
+
+let targetScale=1;
+let currentScale=1;
+
+function animate(){
+requestAnimationFrame(animate);
+
+time+=0.03;
+hue+=0.002;
+
+// galaxy 
+stars.rotation.y += 0.0005;
+
+for(let i=0;i<COUNT;i++){
+
+let i3=i*3;
+
+let tx=targetPositions[i3%targetPositions.length]||0;
+let ty=targetPositions[(i3+1)%targetPositions.length]||0;
+let tz=targetPositions[(i3+2)%targetPositions.length]||0;
+
+basePositions[i3]+= (tx-basePositions[i3])*0.05;
+basePositions[i3+1]+= (ty-basePositions[i3+1])*0.05;
+basePositions[i3+2]+= (tz-basePositions[i3+2])*0.05;
+
+positions[i3]=basePositions[i3]+Math.sin(time+i)*0.02;
+positions[i3+1]=basePositions[i3+1]+Math.cos(time+i)*0.02;
+positions[i3+2]=basePositions[i3+2];
+
+let c=new THREE.Color();
+c.setHSL((hue+i/COUNT)%1,1,0.6);
+
+colors[i3]=c.r;
+colors[i3+1]=c.g;
+colors[i3+2]=c.b;
+}
+
+currentRotationY+=(targetRotationY-currentRotationY)*0.1;
+currentScale+=(targetScale-currentScale)*0.1;
+
+particles.rotation.y=currentRotationY;
+particles.scale.set(currentScale,currentScale,currentScale);
+
+geometry.attributes.position.needsUpdate=true;
+geometry.attributes.color.needsUpdate=true;
+
+renderer.render(scene,camera);
+}
+
+animate();
+
+
+// MUSIC 
+document.getElementById("btn").onclick=()=>{
+document.body.requestFullscreen();
+document.getElementById("music").play();
+};
+
+
+// HAND TRACKING
+const video=document.getElementById("video");
+
+navigator.mediaDevices.getUserMedia({video:true})
+.then(stream=>{
+video.srcObject=stream;
+video.play();
+});
+
+const hands=new Hands({
+locateFile:file=>
+`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+maxNumHands:1,
+modelComplexity:0,
+minDetectionConfidence:0.7,
+minTrackingConfidence:0.7
+});
+
+hands.onResults(results=>{
+if(results.multiHandLandmarks.length>0){
+
+const lm=results.multiHandLandmarks[0];
+const thumb=lm[4];
+const index=lm[8];
+const wrist=lm[0];
+const middle=lm[12];
+
+const dx=thumb.x-index.x;
+const dy=thumb.y-index.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+
+targetScale=1+dist*4;
+
+const angle=Math.atan2(
+middle.y-wrist.y,
+middle.x-wrist.x
+);
+
+targetRotationY=-angle;
+
+if(dist<0.05){
+targetPositions=textPositions;
+}else{
+targetPositions=heartPositions;
+}
+
+}else{
+targetScale=1;
+targetRotationY=0;
+}
+});
+
+const cam=new Camera(video,{
+onFrame:async()=>{
+await hands.send({image:video});
+},
+width:640,
+height:480
+});
+cam.start();
+
+</script>
+</body>
+</html>
